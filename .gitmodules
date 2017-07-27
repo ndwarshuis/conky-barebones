@@ -1,3 +1,3 @@
 [submodule "core"]
 	path = core
-	url = ssh://gitlab@gitlab-host/conky/core.git
+	url = ssh://gitlab@portnoy4prez.ddns.net/conky/core.git
