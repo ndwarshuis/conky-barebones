@@ -22,7 +22,13 @@ local _PLOT_HEIGHT_ = 56
 local _TABLE_SECTION_BREAK_ = 16
 local _TABLE_HEIGHT_ = 80
 
-local MEM_TOTAL_KB = Util.read_file('/proc/meminfo', 'MemTotal:%s+(%d+)') 	--in kB
+local MEM_TOTAL_KB = Util.read_file('/proc/meminfo', 'MemTotal:%s+(%d+)')
+
+local MEMINFO_REGEX = '\nMemFree:%s+(%d+).+'..
+                      '\nBuffers:%s+(%d+).+'..
+                      '\nCached:%s+(%d+).+'..
+                      '\nSReclaimable:%s+(%d+)'
+
 local NUM_ROWS = 3
 
 local TABLE_CONKY = {{}, {}, {}}
@@ -36,8 +42,8 @@ end
 local DIAL_RADIUS = 30
 local DIAL_THETA0 = math.rad(90)
 local DIAL_THETA1 = math.rad(360)
-local DIAL_X = _G_INIT_DATA_.RIGHT_X + DIAL_RADIUS + _DIAL_THICKNESS_ * 0.5
-local DIAL_Y = _G_INIT_DATA_.MIDDLE_Y + DIAL_RADIUS + _DIAL_THICKNESS_ * 0.5
+local DIAL_X = _G_INIT_DATA_.RIGHT_X + DIAL_RADIUS + _DIAL_THICKNESS_ / 2
+local DIAL_Y = _G_INIT_DATA_.MIDDLE_Y + DIAL_RADIUS + _DIAL_THICKNESS_ / 2
 
 local dial = _G_Widget_.Dial{
 	x 				= DIAL_X,
@@ -137,29 +143,28 @@ local tbl = _G_Widget_.Table{
 }
 
 local update = function(cr)
-	local glob = Util.read_file('/proc/meminfo')	--kB
-
 	--see source for "free" for formulas and stuff ;)
 
-	local page_cached 	= __string_match(glob, 'Cached:%s+(%d+)%s'   )
-	local slab 			= __string_match(glob, 'Slab:%s+(%d+)%s'   )
-	local buffers 		= __string_match(glob, 'Buffers:%s+(%d+)%s'  )
-	local free 			= __string_match(glob, 'MemFree:%s+(%d+)%s'  )
+	local memfree_kb, buffers_kb, cached_kb, slab_reclaimable_kb =
+	  __string_match(Util.read_file('/proc/meminfo'), MEMINFO_REGEX)
 
-	local cached = page_cached + buffers
-
-	local used_percent = Util.round((MEM_TOTAL_KB - free - cached - slab) / MEM_TOTAL_KB, 2)
+	local used_percent = Util.round((MEM_TOTAL_KB - memfree_kb - cached_kb -
+	  slab_reclaimable_kb) / MEM_TOTAL_KB, 2)
 
 	Dial.set(dial, used_percent)
 	CriticalText.set(total_used, cr, used_percent * 100)
 
-	local cache_theta = (DIAL_THETA0 - DIAL_THETA1) / MEM_TOTAL_KB * free + DIAL_THETA1
+	local cache_theta = (DIAL_THETA0 - DIAL_THETA1) / MEM_TOTAL_KB * memfree_kb + DIAL_THETA1
 	__cairo_path_destroy(cache_arc.path)
 	cache_arc.path = Arc.create_path(cr, DIAL_X, DIAL_Y, DIAL_RADIUS, dial.dial_angle, cache_theta)
 	
-	local percents = cache_buff.percents
-	TextColumn.set(percents, cr, 1, Util.precision_round_to_string(cached / MEM_TOTAL_KB * 100))
-	TextColumn.set(percents, cr, 2, Util.precision_round_to_string(buffers / MEM_TOTAL_KB * 100))
+	local _percents = cache_buff.percents
+	
+	TextColumn.set(_percents, cr, 1, Util.precision_round_to_string(
+	  cached_kb / MEM_TOTAL_KB * 100))
+	  
+	TextColumn.set(_percents, cr, 2, Util.precision_round_to_string(
+	  buffers_kb / MEM_TOTAL_KB * 100))
 
 	LabelPlot.update(plot, used_percent)
 
