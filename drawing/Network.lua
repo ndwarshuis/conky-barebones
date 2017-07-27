@@ -2,15 +2,11 @@ local Text		= require 'Text'
 local ScalePlot = require 'ScalePlot'
 local Util		= require 'Util'
 
-local __string_gmatch = string.gmatch
+local __string_gmatch 	= string.gmatch
 local __io_popen		= io.popen
 
 local _PLOT_SEC_BREAK_ = 20
 local _PLOT_HEIGHT_ = 56
-
-local SYSFS_NET = '/sys/class/net/'
-local STATS_RX = '/statistics/rx_bytes'
-local STATS_TX = '/statistics/tx_bytes'
 
 local network_label_function = function(bytes)
 	local new_unit = Util.get_unit_base_K(bytes)
@@ -65,55 +61,45 @@ local upload = {
 	}
 }
 
-local interfaces = {}
-
-local add_interface = function(iface)
-	local rx_path = SYSFS_NET..iface..STATS_RX
-	local tx_path = SYSFS_NET..iface..STATS_TX
-
-	interfaces[iface] = {
-		rx_path = rx_path,
-		tx_path = tx_path,
-		rx_cumulative_bytes = 0,
-		tx_cumulative_bytes = 0,
-		prev_rx_cumulative_bytes = Util.read_file(rx_path, nil, '*n'),
-		prev_tx_cumulative_bytes = Util.read_file(tx_path, nil, '*n'),
-	}
-end
-
-for iface in __io_popen('ls -1 '..SYSFS_NET):lines() do
-	add_interface(iface)
-end
+local interface_counters_tbl = {}
 
 local update = function(cr, update_frequency)
 	local dspeed, uspeed = 0, 0
-	local glob = Util.execute_cmd('ip route show')
 
-	local rx_bps, tx_bps
+	local rx_delta, tx_delta
 
-	for iface in __string_gmatch(glob, 'default via %d+%.%d+%.%d+%.%d+ dev (%w+) ') do
-		local current_iface = interfaces[iface]
+	-- iterate through the route file and filter on interfaces that are gateways (flag = 0003)
+	local iterator = __string_gmatch(Util.read_file('/proc/net/route'),
+	  '(%w+)%s+%w+%s+%w+%s+0003%s+')
 
-		if not current_iface then
-			add_interface(iface)
-			current_iface = interfaces[iface]
+	for interface in iterator do
+		local interface_counters = interface_counters_tbl[interface]
+
+		if not interface_counters then
+			local rx_path = '/sys/class/net/'..interface..'/statistics/rx_bytes'
+			local tx_path = '/sys/class/net/'..interface..'/statistics/tx_bytes'
+
+			interface_counters = {
+				rx_path = rx_path,
+				tx_path = tx_path,
+				prev_rx_byte_cnt = Util.read_file(rx_path, nil, '*n'),
+				prev_tx_byte_cnt = Util.read_file(tx_path, nil, '*n'),
+			}
+			interface_counters_tbl[interface] = interface_counters
 		end
 		
-		local new_rx_cumulative_bytes = Util.read_file(current_iface.rx_path, nil, '*n')
-		local new_tx_cumulative_bytes = Util.read_file(current_iface.tx_path, nil, '*n')
+		local rx_byte_cnt = Util.read_file(interface_counters.rx_path, nil, '*n')
+		local tx_byte_cnt = Util.read_file(interface_counters.tx_path, nil, '*n')
 		
-		rx_bps = (new_rx_cumulative_bytes - current_iface.prev_rx_cumulative_bytes) * update_frequency
-		tx_bps = (new_tx_cumulative_bytes - current_iface.prev_tx_cumulative_bytes) * update_frequency
+		rx_delta = rx_byte_cnt - interface_counters.prev_rx_byte_cnt
+		tx_delta = tx_byte_cnt - interface_counters.prev_tx_byte_cnt
 
-		current_iface.prev_rx_cumulative_bytes = new_rx_cumulative_bytes
-		current_iface.prev_tx_cumulative_bytes = new_tx_cumulative_bytes
+		interface_counters.prev_rx_byte_cnt = rx_byte_cnt
+		interface_counters.prev_tx_byte_cnt = tx_byte_cnt
 
-		--mask overflow
-		if rx_bps < 0 then rx_bps = 0 end
-		if tx_bps < 0 then tx_bps = 0 end
-
-		dspeed = dspeed + rx_bps
-		uspeed = uspeed + tx_bps
+		-- mask overflow
+		if rx_delta > 0 then dspeed = dspeed + rx_delta * update_frequency end
+		if tx_delta > 0 then uspeed = uspeed + tx_delta * update_frequency end
 	end
 
 	local dspeed_unit = Util.get_unit(dspeed)
@@ -131,9 +117,6 @@ end
 
 _PLOT_SEC_BREAK_ = nil
 _PLOT_HEIGHT_ = nil
-SYSFS_NET = nil
-STATS_RX = nil
-STATS_TX = nil
 
 local draw = function(cr, update_frequency)
 	update(cr, update_frequency)
