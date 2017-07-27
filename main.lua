@@ -1,26 +1,6 @@
---CONVENTIONS:
---0: true, 1: false
-
-local ABS_PATH = os.getenv('CONKY_LUA_HOME')
-
-package.path = ABS_PATH..'/?.lua;'..
-  ABS_PATH..'/module/?.lua;'..
-  ABS_PATH..'/schema/?.lua;'..
-  ABS_PATH..'/core//func/?.lua;'..
-  ABS_PATH..'/core//super/?.lua;'..
-  ABS_PATH..'/core/widget/?.lua;'..
-  ABS_PATH..'/core//widget/arc/?.lua;'..
-  ABS_PATH..'/core//widget/image/?.lua;'..
-  ABS_PATH..'/core//widget/text/?.lua;'..
-  ABS_PATH..'/core//widget/plot/?.lua;'..
-  ABS_PATH..'/core//widget/rect/?.lua;'..
-  ABS_PATH..'/core//widget/poly/?.lua;'
-
-ABS_PATH = nil
-
 local UPDATE_FREQUENCY = 1						--Hz
 
-CONSTRUCTION_GLOBAL = {
+_G_INIT_DATA_ = {
 	UPDATE_INTERVAL = 1 / UPDATE_FREQUENCY,
 	WINDOW_WIDTH	= 700,
 	WINDOW_HEIGHT	= 780,
@@ -29,48 +9,68 @@ CONSTRUCTION_GLOBAL = {
 	TOP_Y			= 34,
 	MIDDLE_Y		= 135,
 	SECTION_WIDTH 	= 300,
+
+	ABS_PATH		= os.getenv('CONKY_LUA_HOME')
 }
 
-conky_set_update_interval(CONSTRUCTION_GLOBAL.UPDATE_INTERVAL)
+package.path = _G_INIT_DATA_.ABS_PATH..'/?.lua;'..
+  _G_INIT_DATA_.ABS_PATH..'/drawing/?.lua;'..
+  _G_INIT_DATA_.ABS_PATH..'/schema/?.lua;'..
+  _G_INIT_DATA_.ABS_PATH..'/core/func/?.lua;'..
+  _G_INIT_DATA_.ABS_PATH..'/core/super/?.lua;'..
+  _G_INIT_DATA_.ABS_PATH..'/core/widget/?.lua;'..
+  _G_INIT_DATA_.ABS_PATH..'/core/widget/arc/?.lua;'..
+  _G_INIT_DATA_.ABS_PATH..'/core/widget/image/?.lua;'..
+  _G_INIT_DATA_.ABS_PATH..'/core/widget/text/?.lua;'..
+  _G_INIT_DATA_.ABS_PATH..'/core/widget/plot/?.lua;'..
+  _G_INIT_DATA_.ABS_PATH..'/core/widget/rect/?.lua;'..
+  _G_INIT_DATA_.ABS_PATH..'/core/widget/poly/?.lua;'
+
+conky_set_update_interval(_G_INIT_DATA_.UPDATE_INTERVAL)
 
 require 'cairo'
+
+_G_Widget_ 		= require 'Widget'
+_G_Patterns_ 	= require 'Patterns'
 
 local Network 		= require 'Network'
 local Processor 	= require 'Processor'
 local Memory		= require 'Memory'
 
+local _unrequire_ = function(m) package.loaded[m] = nil end
 
-local updates = -2
+_G_Widget_ = nil
+_G_Patterns_ = nil
 
-local unrequire = function(m)
-	package.loaded[m] = nil
-	_G[m] = nil
-end
+_unrequire_('Super')
+_unrequire_('Color')
+_unrequire_('Gradient')
+_unrequire_('Widget')
+_unrequire_('Patterns')
 
-unrequire('Gradient')
+_unrequire_ = nil
 
-unrequire = nil
+_G_INIT_DATA_ = nil
 
-CONSTRUCTION_GLOBAL = nil
-
-local _CAIRO_XLIB_SURFACE_CREATE 	= cairo_xlib_surface_create
-local _CAIRO_CREATE 				= cairo_create
-local _CAIRO_SURFACE_DESTROY 		= cairo_surface_destroy
-local _CAIRO_DESTROY 				= cairo_destroy
-local _COLLECTGARBAGE				= collectgarbage
+local __cairo_xlib_surface_create 	= cairo_xlib_surface_create
+local __cairo_create 				= cairo_create
+local __cairo_surface_destroy 		= cairo_surface_destroy
+local __cairo_destroy 				= cairo_destroy
+local __collectgarbage				= collectgarbage
 
 function conky_main()
-	local cw = conky_window
-    if not cw then return end
-    --~ print(cw.width, cw.height)	###USE THIS TO GET WIDTH AND HEIGHT OF WINDOW
-    local cs = _CAIRO_XLIB_SURFACE_CREATE(cw.display, cw.drawable, cw.visual, 700, 778)
-    local cr = _CAIRO_CREATE(cs)
-
+	local _cw = conky_window
+    if not _cw then return end
+    local cs = __cairo_xlib_surface_create(_cw.display, _cw.drawable, _cw.visual, 700, 778)
+    local cr = __cairo_create(cs)
+	
 	Network(cr, UPDATE_FREQUENCY)
+	
 	Processor(cr)
+	
 	Memory(cr)
-
-    _CAIRO_SURFACE_DESTROY(cs)
-    _CAIRO_DESTROY(cr)
-    _COLLECTGARBAGE()
+	
+    __cairo_surface_destroy(cs)
+    __cairo_destroy(cr)
+    __collectgarbage()
 end
