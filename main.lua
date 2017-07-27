@@ -63,9 +63,7 @@ function conky_main()
     local cr = __cairo_create(cs)
 	
 	Network(cr, UPDATE_FREQUENCY)
-	
 	Processor(cr)
-	
 	Memory(cr)
 	
     __cairo_surface_destroy(cs)
