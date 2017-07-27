@@ -5,20 +5,14 @@ local Util		= require 'Util'
 local __string_gmatch = string.gmatch
 local __io_popen		= io.popen
 
---construction params
-local MODULE_X = 30
-local MODULE_Y = 34
-
-local PLOT_SEC_BREAK = 20
-local PLOT_HEIGHT = 56
-local PLOT_WIDTH = 300
-local PLOT_SPACING = 30
+local _PLOT_SEC_BREAK_ = 20
+local _PLOT_HEIGHT_ = 56
 
 local SYSFS_NET = '/sys/class/net/'
 local STATS_RX = '/statistics/rx_bytes'
 local STATS_TX = '/statistics/tx_bytes'
 
-local __network_label_function = function(bytes)
+local network_label_function = function(bytes)
 	local new_unit = Util.get_unit_base_K(bytes)
 	
 	local converted = Util.convert_bytes(bytes, 'KiB', new_unit)
@@ -27,52 +21,47 @@ local __network_label_function = function(bytes)
 	return Util.round_to_string(converted, precision)..' '..new_unit..'/s'
 end
 
-local RIGHT_X = MODULE_X + PLOT_WIDTH
-local PLOT_Y = MODULE_Y + PLOT_SEC_BREAK
-
 local dnload = {
 	label = _G_Widget_.Text{
-		x = MODULE_X,
-		y = MODULE_Y,
+		x = _G_INIT_DATA_.LEFT_X,
+		y = _G_INIT_DATA_.TOP_Y,
 		text = 'Download',
 	},
 	speed = _G_Widget_.Text{
-		x = RIGHT_X,
-		y = MODULE_Y,
+		x = _G_INIT_DATA_.LEFT_X + _G_INIT_DATA_.SECTION_WIDTH,
+		y = _G_INIT_DATA_.TOP_Y,
 		x_align = 'right',
 		append_end=' KiB/s',
 		text_color = _G_Patterns_.BLUE
 	},
 	plot = _G_Widget_.ScalePlot{
-		x = MODULE_X,
-		y = PLOT_Y,
-		width = PLOT_WIDTH,
-		height = PLOT_HEIGHT,
-		y_label_func = __network_label_function
+		x = _G_INIT_DATA_.LEFT_X,
+		y = _G_INIT_DATA_.TOP_Y + _PLOT_SEC_BREAK_,
+		width = _G_INIT_DATA_.SECTION_WIDTH,
+		height = _PLOT_HEIGHT_,
+		y_label_func = network_label_function
 	}
 }
 
-local UPLOAD_X = RIGHT_X + PLOT_SPACING
-
 local upload = {
 	label = _G_Widget_.Text{
-		x = UPLOAD_X,
-		y = MODULE_Y,
+		x = _G_INIT_DATA_.RIGHT_X,
+		y = _G_INIT_DATA_.TOP_Y,
 		text = 'Upload',
 	},
 	speed = _G_Widget_.Text{
-		x = UPLOAD_X + PLOT_WIDTH,
-		y = MODULE_Y,
+		x = _G_INIT_DATA_.RIGHT_X + _G_INIT_DATA_.SECTION_WIDTH,
+		y = _G_INIT_DATA_.TOP_Y,
 		x_align = 'right',
 		append_end=' KiB/s',
 		text_color = _G_Patterns_.BLUE
 	},
 	plot = _G_Widget_.ScalePlot{
-		x = UPLOAD_X,
-		y = PLOT_Y,
-		width = PLOT_WIDTH,
-		height = PLOT_HEIGHT,
-		y_label_func = __network_label_function
+		x = _G_INIT_DATA_.RIGHT_X,
+		y = _G_INIT_DATA_.TOP_Y + _PLOT_SEC_BREAK_,
+		width = _G_INIT_DATA_.SECTION_WIDTH,
+		height = _PLOT_HEIGHT_,
+		y_label_func = network_label_function
 	}
 }
 
@@ -140,17 +129,11 @@ local update = function(cr, update_frequency)
 	ScalePlot.update(upload.plot, cr, uspeed)
 end
 
-MODULE_X = nil
-MODULE_Y = nil
-PLOT_SEC_BREAK = nil
-PLOT_SPACING = nil
-PLOT_HEIGHT = nil
+_PLOT_SEC_BREAK_ = nil
+_PLOT_HEIGHT_ = nil
 SYSFS_NET = nil
 STATS_RX = nil
 STATS_TX = nil
-RIGHT_X = nil
-UPLOAD_X = nil
-PLOT_Y = nil
 
 local draw = function(cr, update_frequency)
 	update(cr, update_frequency)
