@@ -116,18 +116,11 @@ local update = function(cr)
 	CriticalText.set(total_load, cr, load_percent * 100)
 
 	local process_glob = Util.execute_cmd('ps -A -o s')
-	
-	local running 				= Util.char_count(process_glob, 'R')
-	local interrupted_sleep 	= Util.char_count(process_glob, 'S')
-	local zombie 				= Util.char_count(process_glob, 'Z')
-
-	--subtract one b/c ps will always be "running"
-	running = __tonumber(running) - 1
 
 	local totals = process.totals
-	TextColumn.set(totals, cr, 1, running)
-	TextColumn.set(totals, cr, 2, interrupted_sleep)
-	TextColumn.set(totals, cr, 3, zombie)
+	TextColumn.set(totals, cr, 1, Util.char_count(process_glob, 'R') - 1)
+	TextColumn.set(totals, cr, 2, Util.char_count(process_glob, 'S'))
+	TextColumn.set(totals, cr, 3, Util.char_count(process_glob, 'Z'))
 
 	LabelPlot.update(plot, load_percent)
 
