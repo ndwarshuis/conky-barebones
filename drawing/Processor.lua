@@ -1,7 +1,6 @@
-local Arc 			= require 'Arc'
-local Dial 			= require 'Dial'
+local Line 			= require 'Line'
+local Text			= require 'Text'
 local CriticalText	= require 'CriticalText'
-local TextColumn	= require 'TextColumn'
 local LabelPlot		= require 'LabelPlot'
 local Table			= require 'Table'
 local Util			= require 'Util'
@@ -9,12 +8,7 @@ local Util			= require 'Util'
 local __tonumber 		= tonumber
 local __string_match	= string.match
 
-local _DIAL_RADIUS_ = 30
-local _DIAL_THICKNESS_ = 5
-
-local _TEXT_Y_OFFSET_ = 10
-local _TEXT_LEFT_X_OFFSET_ = 25
-local _TEXT_SPACING_ = 22
+local _SEPARATOR_SPACING_ = 20
 local _PLOT_SECTION_BREAK_ = 20
 local _PLOT_HEIGHT_ = 56
 local _TABLE_SECTION_BREAK_ = 16
@@ -30,57 +24,46 @@ for r = 1, NUM_ROWS do
 	TABLE_CONKY[3][r] = '${top cpu '..r..'}'
 end
 
-local _DIAL_X_ = _G_INIT_DATA_.LEFT_X + _DIAL_RADIUS_ + _DIAL_THICKNESS_ / 2
-local _DIAL_Y_ = _G_INIT_DATA_.MIDDLE_Y + _DIAL_RADIUS_ + _DIAL_THICKNESS_ / 2
-
-local dial = _G_Widget_.Dial{
-	x 				= _DIAL_X_,
-	y 				= _DIAL_Y_,			
-	radius 			= _DIAL_RADIUS_,
-	thickness 		= _DIAL_THICKNESS_,
-	critical_limit	= '>0.8'
-}
-
-local total_load = _G_Widget_.CriticalText{
-	x 			= _DIAL_X_,
-	y 			= _DIAL_Y_,
-	x_align 	= 'center',
-	y_align 	= 'center',
-	append_end 	= '%',
-}
-
-local inner_ring = _G_Widget_.Arc{
-	x = _DIAL_X_,
-	y = _DIAL_Y_,
-	radius = _DIAL_RADIUS_ - _DIAL_THICKNESS_ / 2 - 2,
-	theta0 = 0,
-	theta1 = 360
-}
-
-local _LINE_1_Y_ = _G_INIT_DATA_.MIDDLE_Y + _TEXT_Y_OFFSET_
-local _TEXT_LEFT_X_ = _G_INIT_DATA_.LEFT_X + _DIAL_RADIUS_ * 2 + _TEXT_LEFT_X_OFFSET_ + _DIAL_THICKNESS_
 local _RIGHT_X_ = _G_INIT_DATA_.LEFT_X + _G_INIT_DATA_.SECTION_WIDTH
 
 local process = {
-	labels = _G_Widget_.TextColumn{
-		x 		= _TEXT_LEFT_X_,
-		y 		= _LINE_1_Y_,
-		spacing = _TEXT_SPACING_,
-		'Running',
-		'Sleeping',
-		'Zombie'
+	label = _G_Widget_.Text{
+		x 		= _G_INIT_DATA_.LEFT_X,
+		y 		= _G_INIT_DATA_.MIDDLE_Y,
+		text 	= 'R | S | Z'
 	},
-	totals = _G_Widget_.TextColumn{
+	value = _G_Widget_.Text{
 		x 			= _RIGHT_X_,
-		y 			= _LINE_1_Y_,
-		spacing 	= _TEXT_SPACING_,
+		y 			= _G_INIT_DATA_.MIDDLE_Y,
 		x_align 	= 'right',
 		text_color 	= _G_Patterns_.BLUE,
-		num_rows	= 3
 	}
 }
 
-local _PLOT_Y_ = _G_INIT_DATA_.MIDDLE_Y + _PLOT_SECTION_BREAK_ + _DIAL_RADIUS_ * 2 + _DIAL_THICKNESS_
+local _SEP_Y_ = _G_INIT_DATA_.MIDDLE_Y + _SEPARATOR_SPACING_
+
+local separator = _G_Widget_.Line{
+	p1 = {x = _G_INIT_DATA_.LEFT_X, y = _SEP_Y_},
+	p2 = {x = _RIGHT_X_, y = _SEP_Y_}
+}
+
+local _LINE_2_Y_ = _SEP_Y_ + _SEPARATOR_SPACING_
+
+local total_load = {
+	label = _G_Widget_.Text{
+		x 			= _G_INIT_DATA_.LEFT_X,
+		y 			= _LINE_2_Y_,
+		text 		= 'CPU Load'
+	},
+	value = _G_Widget_.CriticalText{
+		x 			= _RIGHT_X_,
+		y 			= _LINE_2_Y_,
+		x_align 	= 'right',
+		append_end 	= '%',
+	}
+}
+
+local _PLOT_Y_ = _LINE_2_Y_ + _PLOT_SECTION_BREAK_
 
 local plot = _G_Widget_.LabelPlot{
 	x 		= _G_INIT_DATA_.LEFT_X,
@@ -94,7 +77,7 @@ local tbl = _G_Widget_.Table{
 	y 		= _PLOT_Y_ + _PLOT_HEIGHT_ + _TABLE_SECTION_BREAK_,
 	width 	= _G_INIT_DATA_.SECTION_WIDTH,
 	height 	= _TABLE_HEIGHT_,
-	num_rows= 3,
+	num_rows= NUM_ROWS,
 	'Name',
 	'PID',
 	'CPU (%)'
@@ -107,20 +90,16 @@ for i = 1, N_CPU do CPU_TABLE[i] = '${cpu '..i..'}' end
 
 local update = function(cr)
 	local sum = 0
-	for i = 1, N_CPU do
-		sum = sum + Util.conky_numeric(CPU_TABLE[i])
-	end
+	for i = 1, N_CPU do	sum = sum + Util.conky_numeric(CPU_TABLE[i]) end
 	local load_percent = sum * 0.01 / N_CPU
-	Dial.set(dial, load_percent)
 	
-	CriticalText.set(total_load, cr, load_percent * 100)
-
 	local process_glob = Util.execute_cmd('ps -A -o s')
 
-	local totals = process.totals
-	TextColumn.set(totals, cr, 1, Util.char_count(process_glob, 'R') - 1)
-	TextColumn.set(totals, cr, 2, Util.char_count(process_glob, 'S'))
-	TextColumn.set(totals, cr, 3, Util.char_count(process_glob, 'Z'))
+	Text.set(process.value, cr, (Util.char_count(process_glob, 'R') - 1)..' | '..
+	  Util.char_count(process_glob, 'S')..' | '..
+	  Util.char_count(process_glob, 'Z'))
+
+	CriticalText.set(total_load.value, cr, load_percent * 100)
 
 	LabelPlot.update(plot, load_percent)
 
@@ -132,30 +111,26 @@ local update = function(cr)
 	end
 end
 
-_DIAL_RADIUS_ = nil
-_DIAL_THICKNESS_ = nil
-_TEXT_Y_OFFSET_ = nil
-_TEXT_LEFT_X_OFFSET_ = nil
-_TEXT_SPACING_ = nil
+_SEPARATOR_SPACING_ = nil
 _PLOT_SECTION_BREAK_ = nil
 _PLOT_HEIGHT_ = nil
 _TABLE_SECTION_BREAK_ = nil
 _TABLE_HEIGHT_ = nil
-_DIAL_X_ = nil
-_DIAL_Y_ = nil
-_LINE_1_Y_ = nil
-_TEXT_LEFT_X_ = nil
+_SEP_Y_ = nil
+_LINE_2_Y_ = nil
 _RIGHT_X_ = nil
 _PLOT_Y_ = nil
 
 local draw = function(cr)
 	update(cr)
-	Dial.draw(dial, cr)
-	Arc.draw(inner_ring, cr)
-	CriticalText.draw(total_load, cr)
 
-	TextColumn.draw(process.labels, cr)
-	TextColumn.draw(process.totals, cr)
+	Text.draw(process.label, cr)
+	Text.draw(process.value, cr)
+
+	Line.draw(separator, cr)
+	
+	Text.draw(total_load.label, cr)
+	CriticalText.draw(total_load.value, cr)
 
 	LabelPlot.draw(plot, cr)
 
