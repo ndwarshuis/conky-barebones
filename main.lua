@@ -8,7 +8,8 @@ _G_INIT_DATA_ = {
 	MIDDLE_Y		= 135,
 	SECTION_WIDTH 	= 300,
 
-	ABS_PATH		= os.getenv('CONKY_LUA_HOME')
+	-- silly hack, price to pay for being litewait
+	ABS_PATH		= debug.getinfo(1).source:match("@?(.*/)")
 }
 
 package.path = _G_INIT_DATA_.ABS_PATH..'/?.lua;'..
