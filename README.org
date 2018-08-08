@@ -1,0 +1,1 @@
+conky library with useful functions for numeric processing and ui initialization
